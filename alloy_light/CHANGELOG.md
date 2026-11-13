@@ -17,3 +17,4 @@ All notable changes to this add-on are documented here. The format follows
 - Optional basic auth (`loki_username` / `loki_password`).
 - `memory_limit_mib` (GOMEMLIMIT, default 200 MiB), `GOGC=50`, `log_level`.
 - Optional debug UI on port 12345 (not exposed by default).
+- Docker `HEALTHCHECK` on Alloy's `/-/ready` endpoint.

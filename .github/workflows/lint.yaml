@@ -36,7 +36,7 @@ jobs:
           done
 
       - name: shellcheck
-        run: shellcheck alloy_light/rootfs/usr/local/bin/run.sh tests/e2e.sh
+        run: shellcheck alloy_light/rootfs/usr/local/bin/*.sh tests/e2e.sh
 
       - name: alloy fmt
         run: |

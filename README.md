@@ -34,7 +34,8 @@ alloy_light/
 └── rootfs/
     ├── etc/alloy/config.alloy        # pipeline; reads /data/options.json at runtime
     ├── etc/alloy/write/*.alloy       # loki.write with / without basic auth
-    └── usr/local/bin/run.sh          # entrypoint: GOMEMLIMIT, log level, auth variant
+    ├── usr/local/bin/run.sh          # entrypoint: GOMEMLIMIT, log level, auth variant
+    └── usr/local/bin/healthcheck.sh  # Docker HEALTHCHECK (/-/ready)
 tests/
 ├── e2e.sh                            # end-to-end test (synthetic journal → receiver)
 ├── make_journal.py                   # synthetic journal entries

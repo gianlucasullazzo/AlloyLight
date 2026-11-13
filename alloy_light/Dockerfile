@@ -14,7 +14,7 @@ ENV GOMEMLIMIT=200MiB \
     GOGC=50
 
 COPY rootfs/ /
-RUN chmod 0755 /usr/local/bin/run.sh
+RUN chmod 0755 /usr/local/bin/run.sh /usr/local/bin/healthcheck.sh
 
 LABEL \
     io.hass.name="Alloy Light" \
@@ -26,5 +26,7 @@ LABEL \
     org.opencontainers.image.licenses="MIT"
 
 EXPOSE 12345
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["/usr/local/bin/healthcheck.sh"]
 ENTRYPOINT ["/usr/local/bin/run.sh"]
 CMD []
