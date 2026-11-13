@@ -1,0 +1,35 @@
+configuration:
+  loki_url:
+    name: Loki push URL
+    description: Loki push endpoint, e.g. http://192.168.2.126:3500/loki/api/v1/push
+  loki_username:
+    name: Username
+    description: Optional basic auth username. Leave empty to disable authentication.
+  loki_password:
+    name: Password
+    description: Optional basic auth password (used only when a username is set).
+  max_age:
+    name: Maximum history age
+    description: >-
+      How much journal history to read on the very first start (no saved
+      position yet), e.g. 30m, 6h. Later restarts resume from the saved position.
+  drop_debug:
+    name: Drop debug lines
+    description: Discard journal entries with priority "debug".
+  drop_patterns:
+    name: Drop patterns
+    description: Regular expressions (RE2); matching lines are discarded.
+  rate_limit:
+    name: Rate limit (lines/s)
+    description: Maximum lines per second sent to Loki; excess lines are discarded.
+  rate_burst:
+    name: Rate burst
+    description: Maximum burst of lines above the rate limit.
+  memory_limit_mib:
+    name: Memory limit (MiB)
+    description: Soft Go memory limit (GOMEMLIMIT) for Alloy.
+  log_level:
+    name: Alloy log level
+    description: Log level of Alloy itself. Keep "warn" to avoid filling the journal.
+network:
+  12345/tcp: Alloy debug UI (disabled by default)

@@ -1,0 +1,60 @@
+name: Lint & test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  addon-linter:
+    name: Add-on linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: frenck/action-addon-linter@v2
+        with:
+          path: ./alloy_light
+
+  alloy:
+    name: Alloy fmt + e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read pinned Alloy version
+        id: alloy
+        run: |
+          from="$(sed -n 's/^ARG BUILD_FROM=//p' alloy_light/Dockerfile)"
+          echo "image=$from" >> "$GITHUB_OUTPUT"
+          for arch in aarch64 amd64; do
+            grep -q "^  $arch: $from$" alloy_light/build.yaml \
+              || { echo "::error::build.yaml $arch is not $from"; exit 1; }
+          done
+
+      - name: shellcheck
+        run: shellcheck alloy_light/rootfs/usr/local/bin/run.sh tests/e2e.sh
+
+      - name: alloy fmt
+        run: |
+          rc=0
+          for f in alloy_light/rootfs/etc/alloy/config.alloy alloy_light/rootfs/etc/alloy/write/*.alloy tests/receiver.alloy; do
+            if ! docker run --rm -v "$PWD/$f:/c.alloy:ro" --entrypoint /bin/alloy \
+                 "${{ steps.alloy.outputs.image }}" fmt /c.alloy | diff -u "$f" -; then
+              echo "::error file=$f::not formatted (run: alloy fmt -w $f)"; rc=1
+            fi
+          done
+          exit $rc
+
+      - name: Build image (amd64)
+        run: |
+          docker build -t alloy-light:ci \
+            --build-arg BUILD_ARCH=amd64 \
+            --build-arg BUILD_VERSION=ci \
+            alloy_light
+
+      - name: End-to-end test
+        run: tests/e2e.sh alloy-light:ci

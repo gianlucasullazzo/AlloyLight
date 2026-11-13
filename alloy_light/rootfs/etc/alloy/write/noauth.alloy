@@ -1,0 +1,10 @@
+// loki.write without authentication (loki_username empty).
+loki.write "loki" {
+	endpoint {
+		url        = encoding.from_json(local.file.options.content)["loki_url"]
+		batch_size = "1MiB"
+		batch_wait = "5s"
+	}
+
+	external_labels = {instance = "homeassistant"}
+}
