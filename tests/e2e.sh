@@ -19,10 +19,17 @@ NET="alloy-light-e2e-$$"
 RX="alloy-light-rx-$$"
 AL="alloy-light-al-$$"
 
+# Containers run as root and write root-owned files into bind mounts; on a
+# non-root host (GitHub runners) remove them from inside a container.
+wipe() {
+  docker run --rm -v "$(dirname "$1"):/p" ubuntu:24.04 rm -rf "/p/$(basename "$1")" >/dev/null 2>&1 || true
+  rm -rf "$1" 2>/dev/null || true
+}
+
 cleanup() {
   docker rm -f "$AL" "$RX" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
-  rm -rf "$WORK"
+  wipe "$WORK"
 }
 trap cleanup EXIT
 
@@ -52,7 +59,7 @@ received() { docker logs "$RX" 2>&1 | grep 'msg="received log entry"' || true; }
 # start_addon <options.json> : fresh /data, start the add-on container
 start_addon() {
   docker rm -f "$AL" >/dev/null 2>&1 || true
-  rm -rf "$WORK/data"; mkdir -p "$WORK/data"
+  wipe "$WORK/data"; mkdir -p "$WORK/data"
   sed "s#127.0.0.1:3500#$RX:3500#" "$1" > "$WORK/data/options.json"
   docker run -d --name "$AL" --network "$NET" -p 127.0.0.1::12345 \
     -v "$WORK/data:/data" -v "$WORK/journal:/var/log/journal:ro" "$IMAGE" >/dev/null
