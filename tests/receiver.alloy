@@ -1,0 +1,10 @@
+// Test receiver: accepts Loki pushes and prints every entry to stdout.
+loki.source.api "in" {
+	http {
+		listen_address = "0.0.0.0"
+		listen_port    = 3500
+	}
+	forward_to = [loki.echo.out.receiver]
+}
+
+loki.echo "out" { }

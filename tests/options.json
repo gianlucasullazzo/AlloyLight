@@ -1,0 +1,1 @@
+{"loki_url":"http://127.0.0.1:3500/loki/api/v1/push","max_age":"6h","drop_debug":true,"drop_patterns":["Request secret (ssh|samba|mosquitto)_password","Unknown option '(desc|langid_fix)' for Network UPS Tools"],"rate_limit":50,"rate_burst":200,"memory_limit_mib":200,"log_level":"warn"}

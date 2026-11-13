@@ -1,0 +1,15 @@
+// loki.write with HTTP basic auth (loki_username set).
+loki.write "loki" {
+	endpoint {
+		url        = encoding.from_json(local.file.options.content)["loki_url"]
+		batch_size = "1MiB"
+		batch_wait = "5s"
+
+		basic_auth {
+			username = encoding.from_json(local.file.options.content)["loki_username"]
+			password = coalesce(encoding.from_json(local.file.options.content)["loki_password"], "")
+		}
+	}
+
+	external_labels = {instance = "homeassistant"}
+}

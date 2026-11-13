@@ -1,0 +1,86 @@
+// Alloy Light – HAOS journal -> Loki
+//
+// All user options are read at runtime from /data/options.json (written by
+// the Supervisor). Process-level settings that Alloy cannot read from its own
+// config (GOMEMLIMIT, log level, basic auth on/off) are handled by
+// /usr/local/bin/run.sh before Alloy starts.
+
+logging {
+	level  = sys.env("ALLOY_LOG_LEVEL")
+	format = "logfmt"
+}
+
+local.file "options" {
+	filename = sys.env("ALLOY_OPTIONS_FILE")
+}
+
+loki.relabel "journal" {
+	forward_to = []
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		target_label  = "unit"
+	}
+
+	rule {
+		source_labels = ["__journal__hostname"]
+		target_label  = "hostname"
+	}
+
+	rule {
+		source_labels = ["__journal_syslog_identifier"]
+		target_label  = "syslog_identifier"
+	}
+
+	rule {
+		source_labels = ["__journal_container_name"]
+		target_label  = "container_name"
+	}
+
+	rule {
+		source_labels = ["__journal_priority_keyword"]
+		target_label  = "level"
+	}
+}
+
+loki.source.journal "journal" {
+	path          = sys.env("ALLOY_JOURNAL_PATH")
+	max_age       = encoding.from_json(local.file.options.content)["max_age"]
+	relabel_rules = loki.relabel.journal.rules
+	labels        = {job = "systemd-journal"}
+	forward_to    = [loki.process.journal.receiver]
+}
+
+loki.process "journal" {
+	forward_to = [loki.write.loki.receiver]
+
+	// 1. Never ship our own logs (avoids a feedback loop).
+	stage.match {
+		selector            = "{container_name=~\"(addon|app)_[a-z0-9]+_alloy_light\"}"
+		action              = "drop"
+		drop_counter_reason = "self"
+	}
+
+	// 2. Drop debug lines when drop_debug is true. The selector matches
+	//    level="debug" when enabled and a level that never exists when
+	//    disabled (Alloy has no conditional blocks).
+	stage.match {
+		selector            = {"true" = "{level=\"debug\"}", "false" = "{level=\"__alloy_light_never__\"}"}[string.format("%v", encoding.from_json(local.file.options.content)["drop_debug"])]
+		action              = "drop"
+		drop_counter_reason = "debug"
+	}
+
+	// 3. Drop noisy lines. All drop_patterns are OR-ed into a single RE2
+	//    expression; "[^\\s\\S]" never matches, so an empty list drops nothing.
+	stage.drop {
+		expression          = string.join(array.concat(["[^\\s\\S]"], encoding.from_json(local.file.options.content)["drop_patterns"]), "|")
+		drop_counter_reason = "drop_patterns"
+	}
+
+	// 4. Rate limit: lines above rate/burst are discarded.
+	stage.limit {
+		rate  = encoding.from_json(local.file.options.content)["rate_limit"]
+		burst = encoding.from_json(local.file.options.content)["rate_burst"]
+		drop  = true
+	}
+}

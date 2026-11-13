@@ -1,0 +1,38 @@
+name: Alloy Light
+version: "1.0.0"
+slug: alloy_light
+description: Lightweight, filtered HAOS journal shipper to Loki (Grafana Alloy)
+url: https://github.com/gianlucasullazzo/AlloyLight/tree/main/alloy_light
+image: ghcr.io/gianlucasullazzo/{arch}-addon-alloy-light
+arch:
+  - aarch64
+  - amd64
+startup: services
+journald: true
+ports:
+  12345/tcp: null
+ports_description:
+  12345/tcp: Alloy debug UI (disabled by default)
+options:
+  loki_url: "http://192.168.2.126:3500/loki/api/v1/push"
+  max_age: "6h"
+  drop_debug: true
+  drop_patterns:
+    - "Request secret (ssh|samba|mosquitto)_password"
+    - "Unknown option '(desc|langid_fix)' for Network UPS Tools"
+  rate_limit: 50
+  rate_burst: 200
+  memory_limit_mib: 200
+  log_level: warn
+schema:
+  loki_url: url
+  loki_username: str?
+  loki_password: password?
+  max_age: match(^[0-9]+[smh]$)
+  drop_debug: bool
+  drop_patterns:
+    - str
+  rate_limit: int(1,10000)
+  rate_burst: int(1,100000)
+  memory_limit_mib: int(64,2048)
+  log_level: list(debug|info|warn|error)
