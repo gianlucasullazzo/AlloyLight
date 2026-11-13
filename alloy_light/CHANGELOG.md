@@ -4,6 +4,18 @@ All notable changes to this add-on are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the add-on uses
 [SemVer](https://semver.org/).
 
+## [1.0.1] - 2026-11-13
+
+### Fixed
+
+- `level` for Home Assistant Core (`homeassistant`) and Supervisor
+  (`hassio_supervisor`) is now taken from the log text (`DEBUG`, `INFO`,
+  `WARNING`, `ERROR`, `CRITICAL` → `debug`, `info`, `warning`, `error`,
+  `crit`) instead of the journal priority, which Docker always sets to 3
+  (`error`) for stderr. Queries by level now work for Core and Supervisor, and
+  `drop_debug` now also drops Core debug lines. Lines without a level prefix
+  (tracebacks, continuation lines) keep the journal level.
+
 ## [1.0.0] - 2026-11-13
 
 ### Added

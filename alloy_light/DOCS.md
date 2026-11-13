@@ -67,13 +67,38 @@ i.e. on the first start or after a reinstall.
 | `hostname` | `_HOSTNAME` |
 | `syslog_identifier` | `SYSLOG_IDENTIFIER` |
 | `container_name` | `CONTAINER_NAME` |
-| `level` | priority keyword (`emerg` … `debug`) |
+| `level` | journal priority keyword: `emerg`, `alert`, `crit`, `error`, `warning`, `notice`, `info`, `debug` – for Core and Supervisor, see below |
 | `instance` | `homeassistant` |
+
+#### `level` for Home Assistant Core and Supervisor
+
+Docker writes the stderr of every container to the journal with priority 3
+(`error`), whatever the real level is. For the `homeassistant` (Core) and
+`hassio_supervisor` containers, `level` is therefore **taken from the log
+text** instead of the journal priority:
+
+```
+2026-11-13 13:03:50.998+01:00 WARNING (MainThread) [homeassistant.components.mqtt.client] No ACK from MQTT server
+```
+
+| Text | `level` |
+|---|---|
+| `DEBUG` | `debug` (dropped when `drop_debug` is on) |
+| `INFO` | `info` |
+| `WARNING` | `warning` |
+| `ERROR` | `error` |
+| `CRITICAL` | `crit` |
+
+The values are the same keywords the journal uses, so one query works for
+every source. Lines without a level prefix (tracebacks, continuation lines of
+multi-line messages) keep the journal level, i.e. `error`. Other containers are
+not changed.
 
 Example queries:
 
 ```logql
-{job="systemd-journal", container_name="homeassistant"} |= "error"
+{instance="homeassistant", container_name="homeassistant", level="warning"}
+{instance="homeassistant", container_name="homeassistant", level="error"}   # real errors + tracebacks
 {job="systemd-journal", level=~"error|crit|alert|emerg"}
 ```
 
@@ -81,6 +106,8 @@ Example queries:
 
 Applied in this order:
 
+0. Core / Supervisor lines get their real `level` from the text (see above),
+   so the filters below see the corrected level.
 1. Logs of this add-on's own container
    (`container_name=~"(addon|app)_[a-z0-9]+_alloy_light"`) are always dropped,
    to avoid a feedback loop.

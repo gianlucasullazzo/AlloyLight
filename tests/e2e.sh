@@ -89,7 +89,8 @@ wait_count() {
 }
 
 expect_lines() {
-  local got; got="$(received | sed -n 's/.* entry="\([^"]*\)".*/\1/p' | sort)"
+  # compare on the "E2E ..." marker (ignores timestamps / escaped ANSI codes)
+  local got; got="$(received | sed -n 's/.* entry="[^"]*\(E2E [^"\\]*\).*/\1/p' | sort)"
   local want; want="$(printf '%s\n' "$@" | sort)"
   if [ "$got" != "$want" ]; then
     echo "expected:"; echo "$want"; echo "got:"; echo "$got"
@@ -97,24 +98,48 @@ expect_lines() {
   fi
 }
 
-KEEP=("E2E keep supervisor info" "E2E keep core error" "E2E keep host line")
+# expect_level <E2E marker> <level> : the shipped line carrying the marker has this level
+expect_level() {
+  local line; line="$(received | grep -F "$1" || true)"
+  [ -n "$line" ] || fail "line '$1' not shipped"
+  [ "$(wc -l <<<"$line")" -eq 1 ] || fail "line '$1' shipped more than once"
+  grep -qF "level=\\\"$2\\\"" <<<"$line" \
+    || fail "line '$1': expected level=\"$2\", got $(grep -o 'level=\\"[a-z]*\\"' <<<"$line")"
+}
+
+check_ha_levels() {
+  expect_level "E2E ha warning" warning
+  expect_level "E2E ha error" error
+  expect_level "E2E ha critical" crit
+  expect_level "E2E ha info" info
+  expect_level "E2E ha traceback" error
+  expect_level "E2E supervisor info" info
+  expect_level "E2E other container" error
+  expect_level "E2E keep core error" error
+}
+
+KEEP=("E2E keep supervisor info" "E2E keep core error" "E2E keep host line"
+      "E2E ha warning" "E2E ha error" "E2E ha critical" "E2E ha info" "E2E ha traceback"
+      "E2E supervisor info" "E2E other container")
+N_KEEP=${#KEEP[@]}
 
 echo "==> [1] default options"
 start_rx
 start_addon "$HERE/options.json"
 wait_healthy
-wait_count 3
+wait_count "$N_KEEP"
 expect_lines "${KEEP[@]}"
+check_ha_levels
 grep -qF 'labels="{container_name=\"homeassistant\", hostname=\"homeassistant\", instance=\"homeassistant\", job=\"systemd-journal\", level=\"error\", syslog_identifier=\"homeassistant\", unit=\"docker.service\"}"' <<<"$(received)" \
   || fail "labels do not match"
 [ -d "$WORK/data/alloy" ] || fail "/data/alloy not created"
-echo "    ok: 3 lines, labels ok"
+echo "    ok: $N_KEEP lines, labels ok, Core/Supervisor levels from text, HA debug dropped"
 
 echo "==> [2] restart keeps position (no re-read)"
 docker restart "$AL" >/dev/null
 wait_healthy
 sleep 8
-[ "$(received | wc -l)" -eq 3 ] || fail "lines re-shipped after restart ($(received | wc -l))"
+[ "$(received | wc -l)" -eq "$N_KEEP" ] || fail "lines re-shipped after restart ($(received | wc -l))"
 echo "    ok: nothing re-shipped"
 
 echo "==> [3] drop_debug=false, drop_patterns=[]"
@@ -122,9 +147,11 @@ start_rx
 jq '.drop_debug=false | .drop_patterns=[]' "$HERE/options.json" > "$WORK/opts3.json"
 start_addon "$WORK/opts3.json"
 wait_healthy
-wait_count 6
-expect_lines "${KEEP[@]}" "E2E drop debug line" \
+wait_count $((N_KEEP + 4))
+expect_lines "${KEEP[@]}" "E2E drop debug line" "E2E ha debug" \
   "E2E Request secret samba_password noise" "E2E Unknown option 'desc' for Network UPS Tools"
+check_ha_levels
+expect_level "E2E ha debug" debug
 echo "    ok: debug and pattern lines pass through when filters are off"
 
 echo "==> [4] basic auth variant"
@@ -133,8 +160,9 @@ jq '.loki_username="user" | .loki_password="secret" | .log_level="info" | .memor
   "$HERE/options.json" > "$WORK/opts4.json"
 start_addon "$WORK/opts4.json"
 wait_healthy
-wait_count 3
+wait_count "$N_KEEP"
 expect_lines "${KEEP[@]}"
+check_ha_levels
 grep -qF 'GOMEMLIMIT=128MiB GOGC=50 log_level=info auth=basic' <<<"$(docker logs "$AL" 2>&1)" \
   || fail "entrypoint did not apply memory_limit_mib/log_level/auth"
 docker exec "$AL" grep -q basic_auth /tmp/alloy-config/write.alloy || fail "basic_auth config not selected"

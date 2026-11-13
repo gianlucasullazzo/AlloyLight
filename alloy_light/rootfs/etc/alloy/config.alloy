@@ -54,6 +54,31 @@ loki.source.journal "journal" {
 loki.process "journal" {
 	forward_to = [loki.write.loki.receiver]
 
+	// 0. Real level for Home Assistant Core and Supervisor. Docker writes
+	//    their stderr to the journal with priority 3 ("error") whatever the
+	//    real level is, so take it from the text instead:
+	//      2026-11-13 13:03:50.998+01:00 WARNING (MainThread) [x] msg
+	//    and map it to the journal keywords (CRITICAL -> crit, others
+	//    lower-cased: error, warning, info, debug). Lines that do not match
+	//    (tracebacks, continuation lines) keep the journal level. Must run
+	//    before every stage that filters on `level`.
+	stage.match {
+		selector = "{container_name=~\"homeassistant|hassio_supervisor\"}"
+
+		stage.regex {
+			expression = "^\\S+ \\S+ (?P<ha_level>DEBUG|INFO|WARNING|ERROR|CRITICAL) \\("
+		}
+
+		stage.template {
+			source   = "ha_level"
+			template = "{{ if eq .Value \"CRITICAL\" }}crit{{ else }}{{ ToLower .Value }}{{ end }}"
+		}
+
+		stage.labels {
+			values = {level = "ha_level"}
+		}
+	}
+
 	// 1. Never ship our own logs (avoids a feedback loop).
 	stage.match {
 		selector            = "{container_name=~\"(addon|app)_[a-z0-9]+_alloy_light\"}"

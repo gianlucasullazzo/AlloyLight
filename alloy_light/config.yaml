@@ -1,5 +1,5 @@
 name: Alloy Light
-version: "1.0.0"
+version: "1.0.1"
 slug: alloy_light
 description: Lightweight, filtered HAOS journal shipper to Loki (Grafana Alloy)
 url: https://github.com/gianlucasullazzo/AlloyLight/tree/main/alloy_light
